@@ -1,16 +1,26 @@
+﻿using System;
+
 namespace TheatricalPlayersRefactoringKata
 {
-    public class Play
+    public abstract class Play : IPlay
     {
-        private string _name;
-        private string _type;
+        private readonly string _type;
+        private readonly string _name;
+        public string Name { get => _name; }
+        public string Type { get => _type; }
 
-        public string Name { get => _name; set => _name = value; }
-        public string Type { get => _type; set => _type = value; }
-
-        public Play(string name, string type) {
-            this._name = name;
-            this._type = type;
+        public Play(string playType, string playName)
+        {
+            _type = playType;
+            _name = playName;
         }
+
+        public abstract int CalculatePerformanceBonus(Performance perf);
+        public int CalculateBaseCredits(Performance perf)
+        {
+            return Math.Max(perf.Audience - 30, 0);
+        }
+        public abstract int CalculateVolumeCredits(Performance perf);
     }
+
 }

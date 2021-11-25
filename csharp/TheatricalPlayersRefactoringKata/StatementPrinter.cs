@@ -6,26 +6,26 @@ namespace TheatricalPlayersRefactoringKata
 {
     public class StatementPrinter
     {
-        public string PrintAsText(Invoice invoice, Dictionary<string, Play> plays)
+        public string PrintAsText(Invoice invoice, Dictionary<string, IPlay> plays)
         {
             return GenerateReceiptWithFormat(invoice, plays, format: "text");
         }
-        public string PrintAsHtml(Invoice invoice, Dictionary<string, Play> plays)
+        public string PrintAsHtml(Invoice invoice, Dictionary<string, IPlay> plays)
         {
             return GenerateReceiptWithFormat(invoice, plays, format: "html");
         }
 
-        private static string GenerateReceiptWithFormat(Invoice invoice, Dictionary<string, Play> plays, string format)
+        private static string GenerateReceiptWithFormat(Invoice invoice, Dictionary<string, IPlay> plays, string format)
         {
             var totalAmount = 0;
             var volumeCredits = 0;
             CultureInfo cultureInfo = new CultureInfo("en-US");
 
             string result = PrintStatementHeader(invoice, format);
-            result += PrintStatementLines(invoice, plays, ref totalAmount, ref volumeCredits, cultureInfo, format);
+            result += CalculateAndPrintStatementLines(invoice, plays, ref totalAmount, ref volumeCredits, cultureInfo, format);
             result += PrintOwnedAmount(totalAmount, cultureInfo, format);
             result += PrintOwnedCredits(volumeCredits, format);
-            result += PrintStatementFooter(totalAmount, volumeCredits, cultureInfo, format);
+            result += PrintStatementFooter(format);
 
             return result;
         }
@@ -50,7 +50,7 @@ namespace TheatricalPlayersRefactoringKata
             return header;
         }
 
-        private static string PrintStatementFooter(int totalAmount, int volumeCredits, CultureInfo cultureInfo, string format)
+        private static string PrintStatementFooter(string format)
         {
             var result = "";
            
@@ -66,7 +66,7 @@ namespace TheatricalPlayersRefactoringKata
             return result;
         }
 
-        private static string PrintStatementLines(Invoice invoice, Dictionary<string, Play> plays, ref int totalAmount, ref int volumeCredits, CultureInfo cultureInfo, string format)
+        private static string CalculateAndPrintStatementLines(Invoice invoice, Dictionary<string, IPlay> plays, ref int totalAmount, ref int volumeCredits, CultureInfo cultureInfo, string format)
         {
             var lines = "";
 
@@ -83,16 +83,15 @@ namespace TheatricalPlayersRefactoringKata
             foreach (var perf in invoice.Performances)
             {
                 var play = plays[perf.PlayID];
-                var thisAmount = 0;
-                thisAmount = CalculatePerformanceBonus(perf, play);
+                var amount = play.CalculatePerformanceBonus(perf);
                 // add volume credits
-                volumeCredits += CalculateCredits(perf);
+                volumeCredits += play.CalculateBaseCredits(perf);
                 // add extra credit for every ten comedy attendees
-                volumeCredits = AddVolumeCreditsForPlayType(volumeCredits, perf, play);
+                volumeCredits += play.CalculateVolumeCredits(perf);
 
                 // print line for this order
-                lines += PrintOrderLine(cultureInfo, perf, play, thisAmount, format);
-                totalAmount += thisAmount;
+                lines += PrintOrderLine(cultureInfo, perf, play, amount, format);
+                totalAmount += amount;
             }
 
             switch (format)
@@ -107,16 +106,16 @@ namespace TheatricalPlayersRefactoringKata
             return lines;
         }
 
-        private static string PrintOwnedAmount(int totalAmount, CultureInfo cultureInfo, string format)
+        private static string PrintOwnedAmount(int amount, CultureInfo cultureInfo, string format)
         {
             var result = "";
             switch (format)
             {
                 case "html":
-                    result += string.Format(cultureInfo, "<p>Amount owed is <em>{0:C}</em></p>\n", Convert.ToDecimal(totalAmount / 100));
+                    result += string.Format(cultureInfo, "<p>Amount owed is <em>{0:C}</em></p>\n", Convert.ToDecimal(amount / 100));
                     break;
                 case "text":
-                    result += string.Format(cultureInfo, "Amount owed is {0:C}\n", Convert.ToDecimal(totalAmount / 100));
+                    result += string.Format(cultureInfo, "Amount owed is {0:C}\n", Convert.ToDecimal(amount / 100));
                     break ;
                 default:
                     break;
@@ -126,16 +125,16 @@ namespace TheatricalPlayersRefactoringKata
             
         }
 
-        private static string PrintOwnedCredits(int volumeCredits, string format)
+        private static string PrintOwnedCredits(int credits, string format)
         {
             var result = "";
             switch (format)
             {
                 case "html":
-                    result += string.Format("<p>You earned <em>{0}</em> credits</p>\n", volumeCredits);
+                    result += string.Format("<p>You earned <em>{0}</em> credits</p>\n", credits);
                     break;
                 case "text":
-                    result += string.Format("You earned {0} credits\n", volumeCredits);
+                    result += string.Format("You earned {0} credits\n", credits);
                     break;
                 default:
                     break;
@@ -144,52 +143,14 @@ namespace TheatricalPlayersRefactoringKata
             return result;
         }
 
-        private static string PrintOrderLine(CultureInfo cultureInfo, Performance perf, Play play, int thisAmount, string format = "text")
+        private static string PrintOrderLine(CultureInfo cultureInfo, Performance perf, IPlay play, int amount, string format = "text")
         {
             return format switch
             {
-                "text" => string.Format(cultureInfo, "  {0}: {1:C} ({2} seats)\n", play.Name, Convert.ToDecimal(thisAmount / 100), perf.Audience),
-                "html" => string.Format(cultureInfo, "<tr><td>{0}</td><td>{2}</td><td>{1:C}</td></tr>\n", play.Name, Convert.ToDecimal(thisAmount / 100), perf.Audience),
+                "text" => string.Format(cultureInfo, "  {0}: {1:C} ({2} seats)\n", play.Name, Convert.ToDecimal(amount / 100), perf.Audience),
+                "html" => string.Format(cultureInfo, "<tr><td>{0}</td><td>{2}</td><td>{1:C}</td></tr>\n", play.Name, Convert.ToDecimal(amount / 100), perf.Audience),
                 _ => throw new ArgumentException("Incorrect input format"),
             };
-        }
-
-        private static int AddVolumeCreditsForPlayType(int volumeCredits, Performance perf, Play play)
-        {
-            if ("comedy" == play.Type) volumeCredits += (int)Math.Floor((decimal)perf.Audience / 5);
-            return volumeCredits;
-        }
-
-        private static int CalculateCredits(Performance perf)
-        {
-            return Math.Max(perf.Audience - 30, 0);
-        }
-
-        private static int CalculatePerformanceBonus(Performance perf, Play play)
-        {
-            int thisAmount;
-            switch (play.Type)
-            {
-                case "tragedy":
-                    thisAmount = 40000;
-                    if (perf.Audience > 30)
-                    {
-                        thisAmount += 1000 * (perf.Audience - 30);
-                    }
-                    break;
-                case "comedy":
-                    thisAmount = 30000;
-                    if (perf.Audience > 20)
-                    {
-                        thisAmount += 10000 + 500 * (perf.Audience - 20);
-                    }
-                    thisAmount += 300 * perf.Audience;
-                    break;
-                default:
-                    throw new Exception("unknown type: " + play.Type);
-            }
-
-            return thisAmount;
         }
     }
 }
