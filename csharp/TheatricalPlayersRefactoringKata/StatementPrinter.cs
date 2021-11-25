@@ -27,13 +27,13 @@ namespace TheatricalPlayersRefactoringKata
             foreach (var perf in invoice.Performances)
             {
                 var play = plays[perf.PlayID];
-                int lineAmount, lineCredits;
-                CalculateLineTotals(perf, play, out lineAmount, out lineCredits);
+                int lineAmount = 0, lineCredits = 0;
+                CalculateLineTotals(perf, play, ref lineAmount, ref lineCredits);
 
                 // print line for this order
                 result += PrintDetailsLine(cultureInfo, lineAmount, play.Name, perf.Audience, format);
 
-                RecalculateInvoiceTotals(lineAmount, lineCredits, out totalAmount, out totalCredits);
+                RecalculateInvoiceTotals(lineAmount, lineCredits, ref totalAmount, ref totalCredits);
             }
 
             result += PrintDetailsFooter(format);
@@ -44,7 +44,7 @@ namespace TheatricalPlayersRefactoringKata
             return result;
         }
 
-        private static void CalculateLineTotals(Performance perf, IPlay play, out int lineAmount, out int lineCredits)
+        private static void CalculateLineTotals(Performance perf, IPlay play, ref int lineAmount, ref int lineCredits)
         {
             lineAmount = play.CalculatePerformanceBonus(perf);
             // calculate volume credits
@@ -88,7 +88,7 @@ namespace TheatricalPlayersRefactoringKata
             return result;
         }
 
-        private static void RecalculateInvoiceTotals(int amount, int credits, out int totalAmount, out int totalCredits)
+        private static void RecalculateInvoiceTotals(int amount, int credits, ref int totalAmount, ref int totalCredits)
         {
             totalAmount += amount;
             totalCredits += credits;
