@@ -18,30 +18,46 @@ namespace TheatricalPlayersRefactoringKata
         private static string GenerateReceiptWithFormat(Invoice invoice, Dictionary<string, IPlay> plays, string format)
         {
             var totalAmount = 0;
-            var volumeCredits = 0;
+            var totalCredits = 0;
             CultureInfo cultureInfo = new CultureInfo("en-US");
 
-            string result = PrintStatementHeader(invoice, format);
-            result += CalculateAndPrintStatementLines(invoice, plays, ref totalAmount, ref volumeCredits, cultureInfo, format);
+            string result = PrintReceiptHeader(invoice.Customer, format);
+            result += PrintDetailsHeader(format);
+
+            foreach (var perf in invoice.Performances)
+            {
+                var play = plays[perf.PlayID];
+                var lineAmount = play.CalculatePerformanceBonus(perf);
+                // calculate volume credits
+                var lineCredits = play.CalculateBaseCredits(perf);
+                // add extra credit for every ten comedy attendees
+                lineCredits += play.CalculateVolumeCredits(perf);
+
+                // print line for this order
+                result += PrintDetailsLine(cultureInfo, lineAmount, play.Name, perf.Audience, format);
+
+                RecalculateTotals(ref totalAmount, ref totalCredits, lineAmount, lineCredits);
+            }
+
+            result += PrintDetailsFooter(format);
             result += PrintOwnedAmount(totalAmount, cultureInfo, format);
-            result += PrintOwnedCredits(volumeCredits, format);
-            result += PrintStatementFooter(format);
+            result += PrintOwnedCredits(totalCredits, format);
+            result += PrintReceiptFooter(format);
 
             return result;
         }
 
-        private static string PrintStatementHeader(Invoice invoice, string format = "text")
+        private static string PrintReceiptHeader(string customer, string format = "text")
         {
             var header = "";
-
             switch (format)
             {
                 case "html": 
                     header += string.Format("<html>\n");
-                    header += string.Format("<h1>Statement for {0}</h1>\n", invoice.Customer);
+                    header += string.Format("<h1>Statement for {0}</h1>\n", customer);
                     break;
                 case "text":
-                    header += string.Format("Statement for {0}\n", invoice.Customer);
+                    header += string.Format("Statement for {0}\n", customer);
                     break;
                 default:
                     throw new ArgumentException("Incorrect input format");
@@ -50,7 +66,7 @@ namespace TheatricalPlayersRefactoringKata
             return header;
         }
 
-        private static string PrintStatementFooter(string format)
+        private static string PrintReceiptFooter(string format)
         {
             var result = "";
            
@@ -66,10 +82,30 @@ namespace TheatricalPlayersRefactoringKata
             return result;
         }
 
-        private static string CalculateAndPrintStatementLines(Invoice invoice, Dictionary<string, IPlay> plays, ref int totalAmount, ref int volumeCredits, CultureInfo cultureInfo, string format)
+        private static void RecalculateTotals(ref int totalAmount, ref int totalCredits, int amount, int credits)
+        {
+            totalAmount += amount;
+            totalCredits += credits;
+        }
+
+        private static string PrintDetailsFooter(string format)
         {
             var lines = "";
+            switch (format)
+            {
+                case "html":
+                    lines += "</table>\n";
+                    break;
+                default:
+                    break;
+            }
 
+            return lines;
+        }
+
+        private static string PrintDetailsHeader(string format)
+        {
+            var lines = "";
             switch (format)
             {
                 case "html":
@@ -80,29 +116,6 @@ namespace TheatricalPlayersRefactoringKata
                     break;
             }
 
-            foreach (var perf in invoice.Performances)
-            {
-                var play = plays[perf.PlayID];
-                var amount = play.CalculatePerformanceBonus(perf);
-                // add volume credits
-                volumeCredits += play.CalculateBaseCredits(perf);
-                // add extra credit for every ten comedy attendees
-                volumeCredits += play.CalculateVolumeCredits(perf);
-
-                // print line for this order
-                lines += PrintOrderLine(cultureInfo, perf, play, amount, format);
-                totalAmount += amount;
-            }
-
-            switch (format)
-            {
-                case "html":
-                    lines += "</table>\n";
-                    break;
-                default:
-                    break;
-            }
-            
             return lines;
         }
 
@@ -143,12 +156,12 @@ namespace TheatricalPlayersRefactoringKata
             return result;
         }
 
-        private static string PrintOrderLine(CultureInfo cultureInfo, Performance perf, IPlay play, int amount, string format = "text")
+        private static string PrintDetailsLine(CultureInfo cultureInfo, int amount, string name, int audience, string format = "text")
         {
             return format switch
             {
-                "text" => string.Format(cultureInfo, "  {0}: {1:C} ({2} seats)\n", play.Name, Convert.ToDecimal(amount / 100), perf.Audience),
-                "html" => string.Format(cultureInfo, "<tr><td>{0}</td><td>{2}</td><td>{1:C}</td></tr>\n", play.Name, Convert.ToDecimal(amount / 100), perf.Audience),
+                "text" => string.Format(cultureInfo, "  {0}: {1:C} ({2} seats)\n", name, Convert.ToDecimal(amount / 100), audience),
+                "html" => string.Format(cultureInfo, "<tr><td>{0}</td><td>{2}</td><td>{1:C}</td></tr>\n", name, Convert.ToDecimal(amount / 100), audience),
                 _ => throw new ArgumentException("Incorrect input format"),
             };
         }
