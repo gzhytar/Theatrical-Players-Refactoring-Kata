@@ -6,23 +6,72 @@ namespace TheatricalPlayersRefactoringKata
 {
     public class StatementPrinter
     {
-        public string Print(Invoice invoice, Dictionary<string, Play> plays)
+        public string PrintAsText(Invoice invoice, Dictionary<string, Play> plays)
+        {
+            return GenerateReceiptWithFormat(invoice, plays, format: "text");
+        }
+
+        private static string GenerateReceiptWithFormat(Invoice invoice, Dictionary<string, Play> plays, string format)
         {
             var totalAmount = 0;
             var volumeCredits = 0;
             CultureInfo cultureInfo = new CultureInfo("en-US");
 
-            string result = PrintStatementHeader(invoice);
-            result += PrintStatementLines(invoice, plays, ref totalAmount, ref volumeCredits, cultureInfo);
-            result += PrintOwnedAmount(totalAmount, cultureInfo);
-            result = PrintOwnedCredits(volumeCredits, result);
+            string result = PrintStatementHeader(invoice, format);
+            result += PrintStatementLines(invoice, plays, ref totalAmount, ref volumeCredits, cultureInfo, format);
+            result += PrintOwnedAmount(totalAmount, cultureInfo, format);
+            result += PrintOwnedCredits(volumeCredits, format);
+
+            switch (format)
+            {
+                case "html":
+                    result += "</html>";
+                    break;
+                default:
+                    break;
+            }
 
             return result;
         }
 
-        private static string PrintStatementLines(Invoice invoice, Dictionary<string, Play> plays, ref int totalAmount, ref int volumeCredits, CultureInfo cultureInfo)
+        public string PrintAsHtml(Invoice invoice, Dictionary<string, Play> plays)
+        {
+            return GenerateReceiptWithFormat(invoice, plays, format: "html");
+        }
+
+        private static string PrintStatementHeader(Invoice invoice, string format = "text")
+        {
+            var header = "";
+
+            switch (format)
+            {
+                case "html": 
+                    header += string.Format("<html>\n");
+                    header += string.Format("<h1>Statement for {0}</h1>\n", invoice.Customer);
+                    break;
+                case "text":
+                    header += string.Format("Statement for {0}\n", invoice.Customer);
+                    break;
+                default:
+                    throw new ArgumentException("Incorrect input format");
+            };
+
+            return header;
+        }
+        
+        private static string PrintStatementLines(Invoice invoice, Dictionary<string, Play> plays, ref int totalAmount, ref int volumeCredits, CultureInfo cultureInfo, string format)
         {
             var lines = "";
+
+            switch (format)
+            {
+                case "html":
+                    lines += "<table>\n";
+                    lines += "<tr><th>play</th><th>seats</th><th>cost</th></tr>\n";
+                    break;
+                default:
+                    break;
+            }
 
             foreach (var perf in invoice.Performances)
             {
@@ -35,32 +84,67 @@ namespace TheatricalPlayersRefactoringKata
                 volumeCredits = AddVolumeCreditsForPlayType(volumeCredits, perf, play);
 
                 // print line for this order
-                lines += PrintOrderLine(cultureInfo, perf, play, thisAmount);
+                lines += PrintOrderLine(cultureInfo, perf, play, thisAmount, format);
                 totalAmount += thisAmount;
             }
 
+            switch (format)
+            {
+                case "html":
+                    lines += "</table>\n";
+                    break;
+                default:
+                    break;
+            }
+            
             return lines;
         }
 
-        private static string PrintStatementHeader(Invoice invoice)
+        private static string PrintOwnedAmount(int totalAmount, CultureInfo cultureInfo, string format)
         {
-            return string.Format("Statement for {0}\n", invoice.Customer);
+            var result = "";
+            switch (format)
+            {
+                case "html":
+                    result += string.Format(cultureInfo, "<p>Amount owed is <em>{0:C}</em></p>\n", Convert.ToDecimal(totalAmount / 100));
+                    break;
+                case "text":
+                    result += string.Format(cultureInfo, "Amount owed is {0:C}\n", Convert.ToDecimal(totalAmount / 100));
+                    break ;
+                default:
+                    break;
+            }
+
+            return result;
+            
         }
 
-        private static string PrintOwnedCredits(int volumeCredits, string result)
+        private static string PrintOwnedCredits(int volumeCredits, string format)
         {
-            result += String.Format("You earned {0} credits\n", volumeCredits);
+            var result = "";
+            switch (format)
+            {
+                case "html":
+                    result += string.Format("<p>You earned <em>{0}</em> credits</p>\n", volumeCredits);
+                    break;
+                case "text":
+                    result += string.Format("You earned {0} credits\n", volumeCredits);
+                    break;
+                default:
+                    break;
+            }
+
             return result;
         }
 
-        private static string PrintOwnedAmount(int totalAmount, CultureInfo cultureInfo)
+        private static string PrintOrderLine(CultureInfo cultureInfo, Performance perf, Play play, int thisAmount, string format = "text")
         {
-            return String.Format(cultureInfo, "Amount owed is {0:C}\n", Convert.ToDecimal(totalAmount / 100));
-        }
-
-        private static string PrintOrderLine(CultureInfo cultureInfo, Performance perf, Play play, int thisAmount)
-        {
-            return String.Format(cultureInfo, "  {0}: {1:C} ({2} seats)\n", play.Name, Convert.ToDecimal(thisAmount / 100), perf.Audience);
+            return format switch
+            {
+                "text" => string.Format(cultureInfo, "  {0}: {1:C} ({2} seats)\n", play.Name, Convert.ToDecimal(thisAmount / 100), perf.Audience),
+                "html" => string.Format(cultureInfo, "<tr><td>{0}</td><td>{2}</td><td>{1:C}</td></tr>\n", play.Name, Convert.ToDecimal(thisAmount / 100), perf.Audience),
+                _ => throw new ArgumentException("Incorrect input format"),
+            };
         }
 
         private static int AddVolumeCreditsForPlayType(int volumeCredits, Performance perf, Play play)
