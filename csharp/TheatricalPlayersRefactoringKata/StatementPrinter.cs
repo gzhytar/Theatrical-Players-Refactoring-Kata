@@ -10,6 +10,10 @@ namespace TheatricalPlayersRefactoringKata
         {
             return GenerateReceiptWithFormat(invoice, plays, format: "text");
         }
+        public string PrintAsHtml(Invoice invoice, Dictionary<string, Play> plays)
+        {
+            return GenerateReceiptWithFormat(invoice, plays, format: "html");
+        }
 
         private static string GenerateReceiptWithFormat(Invoice invoice, Dictionary<string, Play> plays, string format)
         {
@@ -21,22 +25,9 @@ namespace TheatricalPlayersRefactoringKata
             result += PrintStatementLines(invoice, plays, ref totalAmount, ref volumeCredits, cultureInfo, format);
             result += PrintOwnedAmount(totalAmount, cultureInfo, format);
             result += PrintOwnedCredits(volumeCredits, format);
-
-            switch (format)
-            {
-                case "html":
-                    result += "</html>";
-                    break;
-                default:
-                    break;
-            }
+            result += PrintStatementFooter(totalAmount, volumeCredits, cultureInfo, format);
 
             return result;
-        }
-
-        public string PrintAsHtml(Invoice invoice, Dictionary<string, Play> plays)
-        {
-            return GenerateReceiptWithFormat(invoice, plays, format: "html");
         }
 
         private static string PrintStatementHeader(Invoice invoice, string format = "text")
@@ -58,7 +49,23 @@ namespace TheatricalPlayersRefactoringKata
 
             return header;
         }
-        
+
+        private static string PrintStatementFooter(int totalAmount, int volumeCredits, CultureInfo cultureInfo, string format)
+        {
+            var result = "";
+           
+            switch (format)
+            {
+                case "html":
+                    result += "</html>";
+                    break;
+                default:
+                    break;
+            }
+
+            return result;
+        }
+
         private static string PrintStatementLines(Invoice invoice, Dictionary<string, Play> plays, ref int totalAmount, ref int volumeCredits, CultureInfo cultureInfo, string format)
         {
             var lines = "";
