@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 
 namespace TheatricalPlayersRefactoringKata
 {
@@ -8,32 +9,31 @@ namespace TheatricalPlayersRefactoringKata
     {
         public string PrintAsText(Invoice invoice, Dictionary<string, IPlay> plays)
         {
-            return PrintAs(invoice, plays, format: "text");
+            var performanceInvoices = new PerformanceInvoiceCalculator().CalculatePerformanceInvoices(invoice.Performances, plays);
+
+            return PrintAs(invoice, performanceInvoices, format: "text");
         }
         public string PrintAsHtml(Invoice invoice, Dictionary<string, IPlay> plays)
         {
-            return PrintAs(invoice, plays, format: "html");
+            var performanceInvoices = new PerformanceInvoiceCalculator().CalculatePerformanceInvoices(invoice.Performances, plays);
+
+            return PrintAs(invoice, performanceInvoices, format: "html");
         }
 
-        private static string PrintAs(Invoice invoice, Dictionary<string, IPlay> plays, string format)
+        private static string PrintAs(Invoice invoice, IList<PerformanceInvoice> perfInvoices, string format)
         {
-            var totalAmount = 0;
-            var totalCredits = 0;
             CultureInfo cultureInfo = new CultureInfo("en-US");
 
             string result = PrintReceiptHeader(invoice.Customer, format);
             result += PrintDetailsHeader(format);
 
-            foreach (var perf in invoice.Performances)
+            var totalAmount = perfInvoices.Sum(x => x.PlayPrice);
+            var totalCredits = perfInvoices.Sum(x => x.BonusCredits);
+
+            foreach (var playInvoice in perfInvoices)
             {
-                var play = plays[perf.PlayID];
-                int lineAmount = 0, lineCredits = 0;
-                CalculateLineTotals(perf, play, ref lineAmount, ref lineCredits);
-
                 // print line for this order
-                result += PrintDetailsLine(cultureInfo, lineAmount, play.Name, perf.Audience, format);
-
-                RecalculateInvoiceTotals(lineAmount, lineCredits, ref totalAmount, ref totalCredits);
+                result += PrintDetailsLine(cultureInfo, playInvoice.PlayPrice, playInvoice.Play.Name, playInvoice.Audience, format);
             }
 
             result += PrintDetailsFooter(format);
@@ -42,15 +42,6 @@ namespace TheatricalPlayersRefactoringKata
             result += PrintReceiptFooter(format);
 
             return result;
-        }
-
-        private static void CalculateLineTotals(Performance perf, IPlay play, ref int lineAmount, ref int lineCredits)
-        {
-            lineAmount = play.CalculatePerformanceBonus(perf);
-            // calculate volume credits
-            lineCredits = play.CalculateBaseCredits(perf);
-            // add extra credit for every ten comedy attendees
-            lineCredits += play.CalculateVolumeCredits(perf);
         }
 
         private static string PrintReceiptHeader(string customer, string format = "text")
@@ -86,12 +77,6 @@ namespace TheatricalPlayersRefactoringKata
             }
 
             return result;
-        }
-
-        private static void RecalculateInvoiceTotals(int amount, int credits, ref int totalAmount, ref int totalCredits)
-        {
-            totalAmount += amount;
-            totalCredits += credits;
         }
 
         private static string PrintDetailsFooter(string format)
